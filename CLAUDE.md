@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 仓库概况
 
-这是一个**内容/数据仓库，不是软件项目**：目前没有源代码、解决方案文件、构建系统、测试或 lint 配置。工作目录中没有任何可运行的开发命令。git 仓库尚无任何提交（`master` 分支为空）。
+这是一个 Python 桌面应用（PySide6），实现 Arma 3 音乐包管理器：导入源音频 → 专辑管理 → 转码为 Ogg Vorbis → 自动生成 config.cpp。源码在 `src/`（分层：`models/` 纯数据 dataclass、`services/` 业务逻辑、`ui/` 界面、`utils/` 工具），样式在 `resources/style.qss`。依赖见 `requirements.txt`（PySide6、mutagen、httpx）。
 
-仓库内容仅有一个 Arma 3 模组的完整参考实现，位于 `demo_files/douzi_SAGA_music/`。尽管目录在 `VS_Projects` 下，这里没有 Visual Studio 项目。
+`demo_files/douzi_SAGA_music/` 是一个完整的 Arma 3 音乐模组参考实现，作为管理器输出格式的校验基准（生成器已通过与它的逐字段对照验证）。
 
 **写入约束：** 所有文件写入操作（创建、编辑、覆盖）仅限本仓库文件夹内，严禁写入仓库以外的任何区域（Claude 自身的记忆系统除外）。
 
 ## 仓库内容：Arma 3 音乐模组
 
-`demo_files/douzi_SAGA_music/` 是一个 Arma 3 音乐模组（"=SAGA= 导演任务基础气氛音乐包"，作者 豆子Doge），是计划实现的 Arma 3 音乐包管理器（ArmaMusicPackManager）的参考标准。项目功能需求见 `README.md`（音频导入、专辑管理、转码 Ogg Vorbis、config.cpp 自动生成、AI 文件名翻译、UI）；当前仓库尚无实现代码。
+`demo_files/douzi_SAGA_music/` 是一个 Arma 3 音乐模组（"=SAGA= 导演任务基础气氛音乐包"，作者 豆子Doge），是 Arma 3 音乐包管理器（ArmaMusicPackManager）的输出规范基准。项目功能需求见 `README.md`（音频导入、专辑管理、转码 Ogg Vorbis、config.cpp 自动生成、AI 文件名翻译、UI）。
 
 ### 目录布局
 
@@ -59,4 +59,16 @@ ffprobe -v error -show_entries stream=codec_name,sample_rate,channels,bit_rate \
 
 ## 命令
 
-无构建、lint、测试命令可运行。开发工作流即直接编辑 `config.cpp`、增删 .ogg 文件。在游戏内验证需要 Arma 3 模组打包工具（如 Arma 3 Tools 的 Addon Builder），此类工具不属于本仓库，不假定已安装。
+```bash
+# 安装依赖（首次）
+"C:/Users/mikuf/AppData/Local/Python/bin/python.exe" -m pip install -r requirements.txt
+
+# 运行应用
+"C:/Users/mikuf/AppData/Local/Python/bin/python.exe" src/main.py
+# 无头测试（CI/验证用）
+QT_QPA_PLATFORM=offscreen "...python.exe" src/main.py
+```
+
+注意：`python` 命令在 PATH 里可能解析到 WindowsApps 的 Store 占位符（权限被拒），应使用完整路径 `C:\Users\mikuf\AppData\Local\Python\bin\python.exe`。
+
+无 lint/test 框架；验证方式为直接运行脚本对照（如 config_generator 与 `demo_files/douzi_SAGA_music/config.cpp` 的逐字段对照）。在游戏内验证需要 Arma 3 模组打包工具（如 Arma 3 Tools 的 Addon Builder），不属于本仓库。

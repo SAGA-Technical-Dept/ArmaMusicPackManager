@@ -18,12 +18,15 @@ def to_forward_slash(path: str) -> str:
     return path.replace("\\", "/")
 
 
-def sanitize_filename(name: str) -> str:
+def sanitize_filename(name: str, replace_spaces: bool = False) -> str:
     """生成 Arma 3 安全文件名：替换非法字符、压缩连续下划线、去除首尾空白。
 
     注意：保留撇号（'），因为参考范例中存在含撇号的文件名且 Arma 3 可正常处理。
+    replace_spaces=True 时额外将空白替换为下划线（AI 翻译文件名的要求）。
     """
     name = name.strip()
+    if replace_spaces:
+        name = re.sub(r"\s+", "_", name)
     name = _ILLEGAL_CHARS.sub("_", name)
     name = _UNDERSCORES.sub("_", name)
     name = name.strip("_")

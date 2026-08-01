@@ -50,6 +50,7 @@ class PreviewPanel(QWidget):
         self.btn_play.clicked.connect(self._player.play)
         self.btn_pause.clicked.connect(self._player.pause)
         self.btn_stop.clicked.connect(self._player.stop)
+        self._player.playbackStateChanged.connect(self._on_state)
         btn_row.addWidget(self.btn_play)
         btn_row.addWidget(self.btn_pause)
         btn_row.addWidget(self.btn_stop)
@@ -74,8 +75,12 @@ class PreviewPanel(QWidget):
     # ---- 外部接口 ----
 
     def play_file(self, path: str) -> None:
-        if self._player is None or not os.path.isfile(path):
+        if self._player is None:
             return
+        if not os.path.isfile(path):
+            self._show_error("源文件不存在或已被移动")
+            return
+        self.label.setStyleSheet("color: #888; font-size: 11px;")
         self.label.setText(os.path.basename(path))
         self._player.setSource(QUrl.fromLocalFile(path))
         self._player.play()
@@ -85,6 +90,18 @@ class PreviewPanel(QWidget):
             self._player.stop()
 
     # ---- 内部 ----
+
+    def _show_error(self, message: str) -> None:
+        self.label.setStyleSheet("color: #c66; font-size: 11px;")
+        self.label.setText(f"播放失败: {message}")
+
+    def _on_state(self, state) -> None:
+        """播放/暂停/停止状态 → 按钮可用性联动。"""
+        from PySide6.QtMultimedia import QMediaPlayer
+        playing = state == QMediaPlayer.PlaybackState.PlayingState
+        paused = state == QMediaPlayer.PlaybackState.PausedState
+        self.btn_play.setEnabled(not playing)
+        self.btn_pause.setEnabled(playing or paused)
 
     def _seek(self, value: int) -> None:
         if self._player is not None and self._player.duration() > 0:
@@ -100,9 +117,11 @@ class PreviewPanel(QWidget):
         pass
 
     def _on_status(self, status) -> None:
-        # 播放结束自动复位滑块
+        # 播放结束自动复位滑块；错误状态给出可见提示
         from PySide6.QtMultimedia import QMediaPlayer
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
             self.slider.blockSignals(True)
             self.slider.setValue(0)
             self.slider.blockSignals(False)
+        elif status in (QMediaPlayer.MediaStatus.InvalidMedia, QMediaPlayer.MediaStatus.LoadFailed):
+            self._show_error("无法解码或加载音频文件")

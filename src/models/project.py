@@ -33,6 +33,19 @@ class Project:
 
     # 元数据
     project_file: str = ""              # .amp.json 保存路径
+    _dirty: bool = field(default=False, repr=False)  # 未保存更改标记（不序列化）
+
+    # ---- 脏状态 ----
+
+    def mark_dirty(self) -> None:
+        self._dirty = True
+
+    def mark_clean(self) -> None:
+        self._dirty = False
+
+    @property
+    def is_dirty(self) -> bool:
+        return self._dirty
 
     # ---- 便捷方法 ----
 

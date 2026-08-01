@@ -13,9 +13,11 @@ TRANSLATE_TIMEOUT = 60.0
 
 _SYSTEM_PROMPT = (
     "你是 Arma 3 游戏音乐模组的曲目名翻译助手。"
-    "将英文音乐曲目名翻译为简洁、自然的中文。"
-    "规则：专有名词（专辑名、游戏名、人名、地名）可保留原文或音译；"
-    "游戏原声带曲名保留简洁风格；不要加引号；只输出翻译结果，不要解释。"
+    "将中文音乐曲目名翻译为简洁的英文文件名。"
+    "规则：英文名必须适合作为文件名——全部小写、单词间用下划线连接、"
+    "仅使用字母、数字和下划线，不使用空格和标点；"
+    "专有名词（游戏名、人名、地名）可保留原文或音译；"
+    "不要加引号；只输出翻译结果，不要解释。"
 )
 
 
@@ -40,8 +42,8 @@ def translate_names(
         "messages": [
             {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user", "content": (
-                "请将以下曲目名翻译成中文，以 JSON 对象返回："
-                '{"原曲名": "中文翻译", ...}\n' + json.dumps(names, ensure_ascii=False))},
+                "请将以下曲目名翻译成英文文件名（小写、下划线连接），以 JSON 对象返回："
+                '{"原曲名": "english_filename", ...}\n' + json.dumps(names, ensure_ascii=False))},
         ],
         "temperature": 0.3,
     }

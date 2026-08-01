@@ -16,6 +16,8 @@ from ..services import project_io
 from ..utils.constants import DEFAULT_CLASS_PREFIX, DEFAULT_SOUND_PREFIX
 from ..utils.path_utils import app_root
 
+_TITLE_BASE = "Arma 3 音乐包管理器"
+
 from .dialogs.settings_dialog import NewProjectDialog
 from .panels.ai_panel import AITranslatePanel
 from .panels.album_panel import AlbumPanel
@@ -31,7 +33,6 @@ PAGE_TRACKS = 0
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Arma 3 音乐包管理器")
         self.resize(1100, 700)
         self.setAcceptDrops(True)
 
@@ -42,10 +43,12 @@ class MainWindow(QMainWindow):
             sound_prefix=DEFAULT_SOUND_PREFIX,
             class_prefix=DEFAULT_CLASS_PREFIX,
         )
+        self.project.mark_clean()
 
         self._build_central()
         self._build_toolbar()
         self._build_menu()
+        self._update_title()
         self.refresh_all()
 
     # ---------------------------------------------------------------- UI 构建
@@ -159,40 +162,92 @@ class MainWindow(QMainWindow):
 
     # ---------------------------------------------------------------- 项目生命周期
 
+    def _update_title(self) -> None:
+        """更新窗口标题：项目名 + 脏标记。"""
+        name = self.project.mod_name or "未命名项目"
+        if self.project.project_file:
+            self.setWindowFilePath(self.project.project_file)
+        else:
+            self.setWindowFilePath("")
+            self.setWindowTitle(f"{_TITLE_BASE} — {name}")
+        self.setWindowModified(self.project.is_dirty)
+
+    def _maybe_save(self) -> bool:
+        """如果有未保存更改，弹出确认对话框。返回 True 表示可以继续。"""
+        if not self.project.is_dirty:
+            return True
+        name = self.project.mod_name or "未命名项目"
+        btn = QMessageBox.question(
+            self, "未保存的更改",
+            f"项目「{name}」有未保存的更改。\n\n是否保存后再继续？",
+            QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save,
+        )
+        if btn == QMessageBox.StandardButton.Save:
+            self.save_project()
+            return not self.project.is_dirty  # 保存成功则继续，失败则取消
+        if btn == QMessageBox.StandardButton.Discard:
+            return True
+        return False  # Cancel
+
     def new_project(self) -> None:
+        if not self._maybe_save():
+            return
         dialog = NewProjectDialog(self.project, self)
         if dialog.exec():
             self.project = dialog.result_project()
+            self.project.mark_clean()
+            self._update_title()
             self.refresh_all()
 
     def open_project(self) -> None:
+        if not self._maybe_save():
+            return
         path, _ = QFileDialog.getOpenFileName(
             self, "打开项目", str(self._projects_dir()), "Arma 音乐包项目 (*.amp.json)")
         if not path:
             return
         try:
             self.project = project_io.load_project(path)
+            self.project.mark_clean()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "打开失败", f"无法打开项目：\n{exc}")
             return
+        self._update_title()
         self.refresh_all()
 
     def save_project(self) -> None:
-        if self.project.project_file:
-            project_io.save_project(self.project, self.project.project_file)
-            self.statusBar().showMessage(f"已保存 {os.path.basename(self.project.project_file)}", 3000)
-        else:
-            self.save_project_as()
+        try:
+            if self.project.project_file:
+                project_io.save_project(self.project, self.project.project_file)
+                self.project.mark_clean()
+                self._update_title()
+                self.statusBar().showMessage(f"已保存 {os.path.basename(self.project.project_file)}", 3000)
+            else:
+                self.save_project_as()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "保存失败", f"无法保存项目：\n{exc}")
 
     def save_project_as(self) -> None:
         default_name = f"{self.project.mod_name or 'music_pack'}{project_io.PROJECT_EXT}"
         path, _ = QFileDialog.getSaveFileName(
-            self, "保存项目", str(self._projects_dir() / default_name),
+            self, "保存项目", str(os.path.join(self._projects_dir(), default_name)),
             "Arma 音乐包项目 (*.amp.json)")
         if not path:
             return
-        project_io.save_project(self.project, path)
-        self.refresh_all()
+        try:
+            project_io.save_project(self.project, path)
+            self.project.mark_clean()
+            self._update_title()
+            self.statusBar().showMessage(f"已保存 {os.path.basename(path)}", 3000)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "保存失败", f"无法保存项目：\n{exc}")
+
+    def closeEvent(self, event) -> None:
+        if self._maybe_save():
+            event.accept()
+        else:
+            event.ignore()
 
     def _projects_dir(self) -> str:
         return os.path.join(app_root(), "projects")
@@ -213,6 +268,8 @@ class MainWindow(QMainWindow):
             for t in imported:
                 self.project.tracks[t.track_id] = t
             if imported:
+                self.project.mark_dirty()
+                self._update_title()
                 self.refresh_all()
                 self.statusBar().showMessage(f"已导入 {len(imported)} 首曲目", 3000)
 
@@ -221,6 +278,8 @@ class MainWindow(QMainWindow):
     def remove_selected(self) -> None:
         removed = self.track_panel.remove_selected_tracks()
         if removed:
+            self.project.mark_dirty()
+            self._update_title()
             self.refresh_all()
             self.statusBar().showMessage(f"已移除 {len(removed)} 首曲目", 3000)
 
@@ -228,6 +287,7 @@ class MainWindow(QMainWindow):
         """将曲目划入专辑（右键菜单与拖放共用入口）。"""
         album = self.project.albums.get(album_id)
         if album is None:
+            self.statusBar().showMessage("目标专辑不存在", 2000)
             return
         for tid in track_ids:
             t = self.project.tracks.get(tid)
@@ -240,9 +300,12 @@ class MainWindow(QMainWindow):
                 album.track_ids.append(tid)
             t.album_id = album_id
         self.renumber_album_tracks(album)
+        self.project.mark_dirty()
+        self._update_title()
         self.refresh_all()
 
     def unassign_tracks(self, track_ids: list[str]) -> None:
+        affected_albums: set[str] = set()
         for tid in track_ids:
             t = self.project.tracks.get(tid)
             if t is None:
@@ -250,10 +313,19 @@ class MainWindow(QMainWindow):
             album = self.project.album_of(t)
             if album is not None and tid in album.track_ids:
                 album.track_ids.remove(tid)
+                affected_albums.add(album.album_id)
             t.album_id = None
+        # 重编号受影响的专辑
+        for aid in affected_albums:
+            album = self.project.albums.get(aid)
+            if album is not None:
+                self.renumber_album_tracks(album)
+        self.project.mark_dirty()
+        self._update_title()
         self.refresh_all()
 
     def remove_tracks(self, track_ids: list[str]) -> None:
+        affected_albums: set[str] = set()
         for tid in track_ids:
             t = self.project.tracks.get(tid)
             if t is None:
@@ -261,7 +333,15 @@ class MainWindow(QMainWindow):
             album = self.project.album_of(t)
             if album is not None and tid in album.track_ids:
                 album.track_ids.remove(tid)
+                affected_albums.add(album.album_id)
             self.project.tracks.pop(tid, None)
+        # 重编号受影响的专辑
+        for aid in affected_albums:
+            album = self.project.albums.get(aid)
+            if album is not None:
+                self.renumber_album_tracks(album)
+        self.project.mark_dirty()
+        self._update_title()
         self.refresh_all()
 
     def renumber_album_tracks(self, album) -> None:

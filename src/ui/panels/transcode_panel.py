@@ -201,6 +201,8 @@ class TranscodePanel(QWidget):
             t.transcode_error = error
             if ok:
                 t.transcode_status = "done"
+            self._project.mark_dirty()
+            self._main._update_title()
         self.table.item(row, 3).setText(STATE_DONE if ok else (error or STATE_ERROR))
         bar = self.table.cellWidget(row, 4)
         if isinstance(bar, QProgressBar):

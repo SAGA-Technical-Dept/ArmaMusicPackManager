@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QMenu, QVBoxLayout, QWidget
 
 from ...models import Project
-from ..widgets.track_table import TrackTableModel, TrackTableView
+from ..widgets.track_table import AlbumDelegate, TrackTableModel, TrackTableView
 
 UNASSIGNED_KEY = "__unassigned__"
 
@@ -35,7 +35,17 @@ class TrackListPanel(QWidget):
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._context_menu)
         self.table.doubleClicked.connect(self._on_double_click)
+        # 专辑列内联编辑：变更回调交给主窗口（与右键菜单/拖放共用入口）
+        self.table.set_album_delegate(AlbumDelegate(
+            self._project_getter,
+            self._main.assign_tracks_to_album,
+            self._main.unassign_tracks,
+            self.table,
+        ))
         layout.addWidget(self.table, stretch=1)
+
+    def _project_getter(self) -> Project:
+        return self._main.project
 
     def _on_double_click(self, index) -> None:
         track = self.model.track_at(index.row())
@@ -68,7 +78,9 @@ class TrackListPanel(QWidget):
             tracks = [t for t in tracks
                       if query in t.ogg_filename.lower()
                       or query in t.display_name_en.lower()
-                      or query in t.display_name_zh.lower()]
+                      or query in t.display_name_zh.lower()
+                      or query in t.source_path.lower()
+                      or query in t.source_codec.lower()]
         self.model.set_tracks(tracks)
 
     # ---- 右键菜单 ----

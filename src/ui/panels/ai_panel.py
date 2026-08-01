@@ -12,6 +12,7 @@ from ...models import Project
 from ...services.ai_translator import (
     DEFAULT_BASE_URL, DEFAULT_MODEL, TranslationError, translate_names,
 )
+from ...utils.path_utils import sanitize_filename
 
 STATE_UNT = "待翻译"
 STATE_OK = "已翻译"
@@ -65,9 +66,9 @@ class AITranslatePanel(QWidget):
         cfg_row.addWidget(self.ed_model, stretch=2)
         layout.addLayout(cfg_row)
 
-        # 曲目翻译表（中文名列可编辑）
+        # 曲目翻译表（英文文件名列可编辑）
         self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["曲目", "英文名", "中文翻译（可编辑）"])
+        self.table.setHorizontalHeaderLabels(["曲目", "中文名", "英文翻译(文件名,可编辑)"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
@@ -105,10 +106,11 @@ class AITranslatePanel(QWidget):
         for row, t in enumerate(tracks):
             self._row_of[t.track_id] = row
             self.table.setItem(row, 0, QTableWidgetItem(t.ogg_filename))
-            self.table.setItem(row, 1, QTableWidgetItem(t.display_name_en))
-            zh = QTableWidgetItem(t.display_name_zh)
-            zh.setFlags(zh.flags() | Qt.ItemFlag.ItemIsEditable)
-            self.table.setItem(row, 2, zh)
+            # 中文名列：无中文名时回退英文名
+            self.table.setItem(row, 1, QTableWidgetItem(t.display_name_zh or t.display_name_en))
+            en = QTableWidgetItem(t.display_name_en)
+            en.setFlags(en.flags() | Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(row, 2, en)
 
     # ---- 翻译执行 ----
 
@@ -121,7 +123,8 @@ class AITranslatePanel(QWidget):
             tracks = [self._project.tracks[i] for i in track_ids if i in self._project.tracks]
         if not tracks:
             return
-        names = [t.display_name_en or t.ogg_filename for t in tracks]
+        # 翻译源：中文名（无则回退英文名）
+        names = [t.display_name_zh or t.display_name_en or t.ogg_filename for t in tracks]
         self._save_config()
         self._worker = TranslateWorker(
             names, self.ed_base.text().strip(), self.ed_key.text().strip(),
@@ -152,12 +155,13 @@ class AITranslatePanel(QWidget):
         tracks = list(self._project.tracks.values())
         applied = 0
         for t in tracks:
-            src = t.display_name_en or t.ogg_filename
-            zh = result.get(src)
-            if zh:
+            src = t.display_name_zh or t.display_name_en or t.ogg_filename
+            en = result.get(src)
+            if en:
+                en = sanitize_filename(en, replace_spaces=True)  # 兜底：空格→下划线
                 row = self._row_of.get(t.track_id)
                 if row is not None:
-                    self.table.item(row, 2).setText(zh)
+                    self.table.item(row, 2).setText(en)
                 applied += 1
         self._main.statusBar().showMessage(
             f"翻译完成：{applied}/{len(result)} 首获得翻译，可手动修改后应用", 4000)
@@ -174,10 +178,26 @@ class AITranslatePanel(QWidget):
             return
         tracks = list(self._project.tracks.values())
         count = 0
+        transcoded = 0
         for row, t in enumerate(tracks):
-            zh = self.table.item(row, 2).text().strip()
-            if zh:
-                t.display_name_zh = zh
-                count += 1
+            en = self.table.item(row, 2).text().strip()
+            if not en:
+                continue
+            en = sanitize_filename(en, replace_spaces=True)  # 空格/非法字符 → 下划线
+            if not en:
+                continue
+            t.display_name_en = en
+            t.ogg_filename = f"{en}.ogg"
+            if t.transcode_status == "done":
+                transcoded += 1
+            count += 1
+        if count:
+            self._project.mark_dirty()
+            self._main._update_title()
         self._main.refresh_all()
-        self._main.statusBar().showMessage(f"已应用 {count} 首曲目的中文显示名", 3000)
+        msg = f"已应用 {count} 首曲目的英文文件名"
+        if transcoded:
+            msg += f"\n其中 {transcoded} 首已转码：输出目录中的 .ogg 文件名不会自动重命名，请重新转码以匹配新文件名"
+            QMessageBox.information(self, "应用翻译", msg)
+        else:
+            self._main.statusBar().showMessage(msg, 3000)

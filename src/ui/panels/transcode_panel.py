@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 
 from ...models import Project, Track
 from ...services.transcoder import TranscodeParams, TranscodeError, transcode
+from ...utils.path_utils import app_root
 
 STATE_PENDING = "待转码"
 STATE_RUNNING = "转码中..."
@@ -136,8 +137,7 @@ class TranscodePanel(QWidget):
     def _output_dir(self) -> str:
         if self.ed_output.text().strip():
             return self.ed_output.text().strip()
-        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        return os.path.join(root, "output", self._project.mod_name or "music_pack")
+        return os.path.join(app_root(), "output", self._project.mod_name or "music_pack")
 
     def _album_folder(self, t: Track) -> str:
         album = self._project.album_of(t)

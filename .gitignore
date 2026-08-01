@@ -5,3 +5,7 @@ output/
 projects/
 .env
 *.amp.json
+
+# PyInstaller build artifacts
+build/
+dist/

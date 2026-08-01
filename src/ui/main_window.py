@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 from ..models import Project
 from ..services import project_io
 from ..utils.constants import DEFAULT_CLASS_PREFIX, DEFAULT_SOUND_PREFIX
+from ..utils.path_utils import app_root
 
 from .dialogs.settings_dialog import NewProjectDialog
 from .panels.ai_panel import AITranslatePanel
@@ -194,8 +195,7 @@ class MainWindow(QMainWindow):
         self.refresh_all()
 
     def _projects_dir(self) -> str:
-        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        return os.path.join(root, "projects")
+        return os.path.join(app_root(), "projects")
 
     def project_settings(self) -> None:
         QMessageBox.information(self, "项目设置", "项目设置将在后续版本提供。")

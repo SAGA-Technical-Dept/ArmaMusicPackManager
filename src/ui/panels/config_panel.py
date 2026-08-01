@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 
 from ...models import Project
 from ...services.config_generator import generate_config
+from ...utils.path_utils import app_root
 
 
 class ConfigPanel(QWidget):
@@ -77,5 +78,4 @@ class ConfigPanel(QWidget):
         self._main.statusBar().showMessage(f"已导出 {dest}", 3000)
 
     def _output_root(self) -> str:
-        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        return os.path.join(root, "output")
+        return os.path.join(app_root(), "output")

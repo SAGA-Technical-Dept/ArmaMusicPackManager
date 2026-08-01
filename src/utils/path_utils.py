@@ -2,6 +2,7 @@
 
 import os
 import re
+import sys
 
 _ILLEGAL_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 _UNDERSCORES = re.compile(r"_+")
@@ -37,3 +38,30 @@ def stem_without_ext(path: str) -> str:
 def relative_path(source_path: str, base_dir: str) -> str:
     """返回 source_path 相对于 base_dir 的路径（正斜杠）。"""
     return os.path.relpath(source_path, base_dir).replace("\\", "/")
+
+
+def is_frozen() -> bool:
+    """Return True when running inside a PyInstaller bundle."""
+    return getattr(sys, "frozen", False)
+
+
+def app_root() -> str:
+    """应用根目录（用于运行时目录 output/、projects/ 的默认位置）。
+
+    - Frozen（PyInstaller）：EXE 所在目录
+    - 开发环境：仓库根目录（本文件位于 src/utils/，向上三级）
+    """
+    if is_frozen():
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def resource_path(relative_path: str) -> str:
+    """打包资源文件的路径（通过 --add-data 打包进 EXE 的数据文件）。
+
+    - Frozen（PyInstaller）：sys._MEIPASS 临时解压目录
+    - 开发环境：仓库根目录下
+    """
+    if is_frozen():
+        return os.path.normpath(os.path.join(sys._MEIPASS, relative_path))
+    return os.path.normpath(os.path.join(app_root(), relative_path))

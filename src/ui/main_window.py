@@ -18,6 +18,7 @@ from ..utils.path_utils import app_root
 
 _TITLE_BASE = "Arma 3 音乐包管理器"
 
+from .dialogs.project_settings import ProjectSettingsDialog
 from .dialogs.settings_dialog import NewProjectDialog
 from .panels.ai_panel import AITranslatePanel
 from .panels.album_panel import AlbumPanel
@@ -112,6 +113,10 @@ class MainWindow(QMainWindow):
 
         act = QAction("导入", self)
         act.triggered.connect(self.import_files)
+        toolbar.addAction(act)
+
+        act = QAction("曲目管理", self)
+        act.triggered.connect(lambda: self.stack.setCurrentIndex(PAGE_TRACKS))
         toolbar.addAction(act)
 
         toolbar.addSeparator()
@@ -253,7 +258,12 @@ class MainWindow(QMainWindow):
         return os.path.join(app_root(), "projects")
 
     def project_settings(self) -> None:
-        QMessageBox.information(self, "项目设置", "项目设置将在后续版本提供。")
+        dialog = ProjectSettingsDialog(self.project, self)
+        if dialog.exec():
+            self.project.mark_dirty()
+            self._update_title()
+            self.refresh_all()
+            self.statusBar().showMessage("项目设置已更新", 3000)
 
     # ---------------------------------------------------------------- 导入
 

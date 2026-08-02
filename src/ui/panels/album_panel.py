@@ -6,6 +6,7 @@ import json
 import uuid
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QHBoxLayout, QListWidget, QListWidgetItem, QMenu, QMessageBox,
     QPushButton, QVBoxLayout, QWidget,
@@ -19,6 +20,9 @@ from ..widgets.track_table import MIME_TRACK_IDS
 TYPE_ALL = "all"          # 全部曲目
 TYPE_UNASSIGNED = "none"  # 未分配
 TYPE_ALBUM = "album"      # 具体专辑
+
+# 拖放悬停时目标项的高亮色（比选中蓝 #094771 亮，区分"放置目标"状态）
+_DRAG_HIGHLIGHT = QColor("#1a6fb0")
 
 
 class AlbumPanel(QWidget):
@@ -56,15 +60,34 @@ class AlbumPanel(QWidget):
         if event.mimeData().hasFormat(MIME_TRACK_IDS):
             event.acceptProposedAction()
 
+    def dragMoveEvent(self, event) -> None:
+        if not event.mimeData().hasFormat(MIME_TRACK_IDS):
+            event.ignore()
+            return
+        # itemAt 需要 viewport 坐标：把事件坐标从本面板映射到列表视口
+        pos = self.list.viewport().mapFrom(self, event.position().toPoint())
+        item = self.list.itemAt(pos)
+        self._set_highlight(item)
+        if item is not None:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event) -> None:
+        self._set_highlight(None)
+        super().dragLeaveEvent(event)
+
     def dropEvent(self, event) -> None:
         mime = event.mimeData()
         if not mime.hasFormat(MIME_TRACK_IDS):
             return
+        self._set_highlight(None)
         try:
             track_ids = json.loads(bytes(mime.data(MIME_TRACK_IDS)).decode("utf-8"))
         except (ValueError, UnicodeDecodeError):
             return
-        item = self.list.itemAt(event.position().toPoint())
+        pos = self.list.viewport().mapFrom(self, event.position().toPoint())
+        item = self.list.itemAt(pos)
         kind, album_id = item.data(Qt.ItemDataRole.UserRole) if item else (None, None)
         if kind == TYPE_ALBUM and album_id:
             self.assign_requested.emit(track_ids, album_id)
@@ -72,6 +95,15 @@ class AlbumPanel(QWidget):
         elif kind == TYPE_UNASSIGNED:
             self.unassign_requested.emit(track_ids)
             event.acceptProposedAction()
+
+    def _set_highlight(self, target: QListWidgetItem | None) -> None:
+        """高亮拖放目标项；传入 None 清除所有高亮。"""
+        for i in range(self.list.count()):
+            item = self.list.item(i)
+            if item is target:
+                item.setBackground(QBrush(_DRAG_HIGHLIGHT))
+            else:
+                item.setBackground(QBrush())
 
     # ---- 数据绑定 ----
 

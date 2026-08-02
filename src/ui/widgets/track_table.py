@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, QRect, Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox, QStyledItemDelegate, QTableView, QWidget,
 )
@@ -163,11 +164,13 @@ class TrackTableModel(QAbstractTableModel):
         return [MIME_TRACK_IDS]
 
     def mimeData(self, indexes) -> object:
-        """以 JSON 数组携带选中曲目的 track_id 列表。"""
+        """以 JSON 数组携带选中曲目的 track_id 列表（跨列框选按行去重）。"""
         from PySide6.QtCore import QMimeData
-        ids = []
+        seen_rows: set[int] = set()
+        ids: list[str] = []
         for idx in indexes:
-            if idx.isValid() and idx.column() == 0:
+            if idx.isValid() and idx.row() not in seen_rows:
+                seen_rows.add(idx.row())
                 t = self._tracks[idx.row()]
                 if t is not None:
                     ids.append(t.track_id)
@@ -194,6 +197,16 @@ class AlbumDelegate(QStyledItemDelegate):
         self._project_getter = project_getter
         self._assign_cb = assign_cb
         self._unassign_cb = unassign_cb
+
+    def paint(self, painter, option, index) -> None:
+        super().paint(painter, option, index)
+        # 在单元格右侧绘制下拉箭头，提示该列可单击展开
+        painter.save()
+        painter.setPen(QColor("#888888"))
+        rect = option.rect
+        arrow_rect = QRect(rect.right() - 16, rect.top(), 14, rect.height())
+        painter.drawText(arrow_rect, Qt.AlignmentFlag.AlignCenter, "▼")
+        painter.restore()
 
     def createEditor(self, parent, option, index) -> QWidget:
         combo = QComboBox(parent)
@@ -241,3 +254,11 @@ class TrackTableView(QTableView):
     def set_album_delegate(self, delegate: AlbumDelegate) -> None:
         """为专辑列安装内联编辑器。"""
         self.setItemDelegateForColumn(AlbumDelegate.ALBUM_COLUMN, delegate)
+
+    def mousePressEvent(self, event) -> None:
+        super().mousePressEvent(event)
+        # 单击专辑列即展开内联下拉编辑器（默认双击触发，交互太重）
+        if event.button() == Qt.MouseButton.LeftButton:
+            index = self.indexAt(event.pos())
+            if index.isValid() and index.column() == AlbumDelegate.ALBUM_COLUMN:
+                self.edit(index)

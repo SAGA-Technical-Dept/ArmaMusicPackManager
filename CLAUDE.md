@@ -72,3 +72,32 @@ QT_QPA_PLATFORM=offscreen "...python.exe" src/main.py
 注意：`python` 命令在 PATH 里可能解析到 WindowsApps 的 Store 占位符（权限被拒），应使用完整路径 `C:\Users\mikuf\AppData\Local\Python\bin\python.exe`。
 
 无 lint/test 框架；验证方式为直接运行脚本对照（如 config_generator 与 `demo_files/douzi_SAGA_music/config.cpp` 的逐字段对照）。在游戏内验证需要 Arma 3 模组打包工具（如 Arma 3 Tools 的 Addon Builder），不属于本仓库。
+
+## 开发流程（分支策略）
+
+轻量功能分支工作流，支持多 agent 并行开发：
+
+```
+master      ←←← 只含可发布版本；每次合入 = 更新 __version__ + 打 tag
+developing  ←←← 功能集成区（随时可运行）
+  └── feature/<名称> / fix/<名称> / chore/<名称>  （一律从 developing 签出）
+```
+
+规则：
+
+1. **任何修改从 developing 签出独立分支**（当前无远程仓库，均为本地操作）：
+   ```bash
+   git checkout developing
+   git checkout -b feature/<kebab-case-名称>
+   ```
+   分支命名：`feature/` 新功能、`fix/` 修复、`chore/` 重构/文档/工具。一个分支只做一件事，合并后立即删除，不长期挂起。
+2. **并行冲突管理**：并行任务按文件/模块划分，避免两个 agent 改同一文件（UI 层耦合紧——`main_window.py` 连接所有 panel，`preview_panel.py` 是高频改动点）。后合并的分支先 `git rebase developing` 解决冲突再合并，保持历史线性。
+3. **合并前验证**（项目无测试框架）：无头启动验证 `QT_QPA_PLATFORM=offscreen "...python.exe" src/main.py` + 断言脚本；涉及音频/UI 的改动跑通"导入 → 转码 → 预览播放 → 导出 config"链路。
+4. **feature → developing**：`git merge --no-ff <分支>`（保留功能合并痕迹），随后删除分支。
+5. **developing → master（发布）**：确认稳定后 fast-forward 合入，更新 `src/__init__.py` 的 `__version__`，打对应 tag：
+   ```bash
+   git checkout master && git merge --ff-only developing
+   git tag v0.1.2   # 与 __version__ 一致
+   ```
+   当前基线：`v0.1.1`（对应 `__version__ = "0.1.1"`，master/developing 均指向 6efdd55）。
+6. **调度**：并行任务的分配与分支登记由主导会话统一协调，避免分支名冲突和同文件并发改动。

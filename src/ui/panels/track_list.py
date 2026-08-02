@@ -56,6 +56,8 @@ class TrackListPanel(QWidget):
 
     def set_project(self, project: Project) -> None:
         self._project = project
+        # 同步表格模型的 project 引用（专辑列显示依赖它，否则永远查空项目）
+        self.model._project = project
         self._apply_filter()
 
     def set_album_filter(self, album_id: str | None) -> None:

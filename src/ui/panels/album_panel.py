@@ -1,12 +1,10 @@
-"""专辑侧边栏：专辑列表 + 右键 CRUD + 曲目过滤 + 拖放入专辑。"""
+"""专辑侧边栏：专辑列表 + 右键 CRUD + 曲目过滤。"""
 
 from __future__ import annotations
 
-import json
 import uuid
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QHBoxLayout, QListWidget, QListWidgetItem, QMenu, QMessageBox,
     QPushButton, QVBoxLayout, QWidget,
@@ -14,23 +12,17 @@ from PySide6.QtWidgets import (
 
 from ...models import Album, Project
 from ..dialogs.album_edit import AlbumEditDialog
-from ..widgets.track_table import MIME_TRACK_IDS
 
 # 列表项 type 值
 TYPE_ALL = "all"          # 全部曲目
 TYPE_UNASSIGNED = "none"  # 未分配
 TYPE_ALBUM = "album"      # 具体专辑
 
-# 拖放悬停时目标项的高亮色（比选中蓝 #094771 亮，区分"放置目标"状态）
-_DRAG_HIGHLIGHT = QColor("#1a6fb0")
-
 
 class AlbumPanel(QWidget):
     """显示全部/未分配/各专辑；选中后发出 album_selected(album_id|None)。"""
 
     album_selected = Signal(object)   # album_id (str) 或 None（全部）
-    assign_requested = Signal(list, str)     # 拖放：track_ids → album_id
-    unassign_requested = Signal(list)        # 拖放：track_ids → 未分配
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -50,60 +42,7 @@ class AlbumPanel(QWidget):
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.list.customContextMenuRequested.connect(self._context_menu)
         self.list.currentItemChanged.connect(self._on_select)
-        self.list.setAcceptDrops(True)
-        self.list.viewport().setAcceptDrops(True)
         layout.addWidget(self.list, stretch=1)
-
-    # ---- 拖放（接收曲目表格拖来的 track_ids） ----
-
-    def dragEnterEvent(self, event) -> None:
-        if event.mimeData().hasFormat(MIME_TRACK_IDS):
-            event.acceptProposedAction()
-
-    def dragMoveEvent(self, event) -> None:
-        if not event.mimeData().hasFormat(MIME_TRACK_IDS):
-            event.ignore()
-            return
-        # itemAt 需要 viewport 坐标：把事件坐标从本面板映射到列表视口
-        pos = self.list.viewport().mapFrom(self, event.position().toPoint())
-        item = self.list.itemAt(pos)
-        self._set_highlight(item)
-        if item is not None:
-            event.acceptProposedAction()
-        else:
-            event.ignore()
-
-    def dragLeaveEvent(self, event) -> None:
-        self._set_highlight(None)
-        super().dragLeaveEvent(event)
-
-    def dropEvent(self, event) -> None:
-        mime = event.mimeData()
-        if not mime.hasFormat(MIME_TRACK_IDS):
-            return
-        self._set_highlight(None)
-        try:
-            track_ids = json.loads(bytes(mime.data(MIME_TRACK_IDS)).decode("utf-8"))
-        except (ValueError, UnicodeDecodeError):
-            return
-        pos = self.list.viewport().mapFrom(self, event.position().toPoint())
-        item = self.list.itemAt(pos)
-        kind, album_id = item.data(Qt.ItemDataRole.UserRole) if item else (None, None)
-        if kind == TYPE_ALBUM and album_id:
-            self.assign_requested.emit(track_ids, album_id)
-            event.acceptProposedAction()
-        elif kind == TYPE_UNASSIGNED:
-            self.unassign_requested.emit(track_ids)
-            event.acceptProposedAction()
-
-    def _set_highlight(self, target: QListWidgetItem | None) -> None:
-        """高亮拖放目标项；传入 None 清除所有高亮。"""
-        for i in range(self.list.count()):
-            item = self.list.item(i)
-            if item is target:
-                item.setBackground(QBrush(_DRAG_HIGHLIGHT))
-            else:
-                item.setBackground(QBrush())
 
     # ---- 数据绑定 ----
 

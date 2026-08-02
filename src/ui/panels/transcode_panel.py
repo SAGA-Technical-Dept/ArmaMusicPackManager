@@ -109,7 +109,7 @@ class TranscodePanel(QWidget):
             self._row_of[t.track_id] = row
             album = self._project.album_of(t)
             album_name = album.display_name_zh or album.name if album else "通用"
-            bitrate = t.target_bitrate if t.target_bitrate else (album.target_bitrate if album else 128)
+            bitrate = t.target_bitrate or (album.target_bitrate if album else 128)
             self.table.setItem(row, 0, QTableWidgetItem(t.ogg_filename))
             self.table.setItem(row, 1, QTableWidgetItem(album_name))
             self.table.setItem(row, 2, QTableWidgetItem(f"{bitrate} kbps"))

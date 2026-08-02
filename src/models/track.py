@@ -27,7 +27,7 @@ class Track:
     track_index: int = 0            # 在专辑中的序号（1-based）
 
     # 转码
-    target_bitrate: int = 128       # 目标比特率（kbps）
+    target_bitrate: int = 0         # 目标比特率（kbps）；0 = 跟随专辑设置
     transcode_status: str = "pending"  # pending/done/skipped/error
     transcode_error: str = ""
 

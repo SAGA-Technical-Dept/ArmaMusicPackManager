@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QRect, Qt
@@ -13,7 +12,13 @@ from PySide6.QtWidgets import (
 
 from ...models import Album, Project, Track
 
-MIME_TRACK_IDS = "application/x-track-ids"
+# 转码状态 → 表格显示文本
+_STATUS_TEXT = {
+    "pending": "待转码",
+    "done": "完成",
+    "skipped": "复制(合规)",
+    "error": "失败",
+}
 
 
 class TrackTableModel(QAbstractTableModel):
@@ -131,7 +136,7 @@ class TrackTableModel(QAbstractTableModel):
         if col == 6:
             return self._album_name(t)
         if col == 7:
-            return t.transcode_status
+            return _STATUS_TEXT.get(t.transcode_status, t.transcode_status)
         return ""
 
     def _album_name(self, t: Track) -> str:
@@ -150,35 +155,11 @@ class TrackTableModel(QAbstractTableModel):
             return t.transcode_error
         return self._display_value(t, col)
 
-    # ---- 拖拽支持（曲目 → 专辑面板） ----
-
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         flags = super().flags(index)
-        if index.isValid():
-            flags |= Qt.ItemFlag.ItemIsDragEnabled
-            if index.column() == 6:  # 专辑列可内联编辑
-                flags |= Qt.ItemFlag.ItemIsEditable
+        if index.isValid() and index.column() == 6:  # 专辑列可内联编辑
+            flags |= Qt.ItemFlag.ItemIsEditable
         return flags
-
-    def mimeTypes(self) -> list[str]:
-        return [MIME_TRACK_IDS]
-
-    def mimeData(self, indexes) -> object:
-        """以 JSON 数组携带选中曲目的 track_id 列表（跨列框选按行去重）。"""
-        from PySide6.QtCore import QMimeData
-        seen_rows: set[int] = set()
-        ids: list[str] = []
-        for idx in indexes:
-            if idx.isValid() and idx.row() not in seen_rows:
-                seen_rows.add(idx.row())
-                t = self._tracks[idx.row()]
-                if t is not None:
-                    ids.append(t.track_id)
-        if not ids:
-            return None
-        mime = QMimeData()
-        mime.setData(MIME_TRACK_IDS, json.dumps(ids).encode("utf-8"))
-        return mime
 
 
 class AlbumDelegate(QStyledItemDelegate):
@@ -246,8 +227,6 @@ class TrackTableView(QTableView):
         self.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         self.setAlternatingRowColors(True)
         self.setSortingEnabled(True)  # 点击列头排序（模型内实现 sort()，索引安全）
-        self.setDragEnabled(True)
-        self.setDragDropMode(QTableView.DragDropMode.DragOnly)
         self.verticalHeader().setVisible(False)
         self.horizontalHeader().setStretchLastSection(True)
 

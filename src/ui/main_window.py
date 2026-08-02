@@ -64,8 +64,6 @@ class MainWindow(QMainWindow):
         left_layout.setSpacing(2)
         self.album_panel = AlbumPanel(left)
         self.album_panel.album_selected.connect(self.track_panel_filter)
-        self.album_panel.assign_requested.connect(self.assign_tracks_to_album)
-        self.album_panel.unassign_requested.connect(self.unassign_tracks)
         self.preview_panel = PreviewPanel(left)
         left_layout.addWidget(self.album_panel, stretch=3)
         left_layout.addWidget(self.preview_panel, stretch=1)
@@ -111,15 +109,13 @@ class MainWindow(QMainWindow):
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
 
-        act = QAction("导入", self)
-        act.triggered.connect(self.import_files)
-        toolbar.addAction(act)
-
         act = QAction("曲目管理", self)
         act.triggered.connect(lambda: self.stack.setCurrentIndex(PAGE_TRACKS))
         toolbar.addAction(act)
 
-        toolbar.addSeparator()
+        act = QAction("AI 翻译", self)
+        act.triggered.connect(lambda: self.stack.setCurrentIndex(3))
+        toolbar.addAction(act)
 
         act = QAction("转码", self)
         act.triggered.connect(lambda: self.stack.setCurrentIndex(1))
@@ -127,10 +123,6 @@ class MainWindow(QMainWindow):
 
         act = QAction("Config 预览", self)
         act.triggered.connect(lambda: self.stack.setCurrentIndex(2))
-        toolbar.addAction(act)
-
-        act = QAction("AI 翻译", self)
-        act.triggered.connect(lambda: self.stack.setCurrentIndex(3))
         toolbar.addAction(act)
 
     def _build_menu(self) -> None:
@@ -147,11 +139,11 @@ class MainWindow(QMainWindow):
 
         # 编辑
         menu_edit = menubar.addMenu("编辑(&E)")
+        self._add_action(menu_edit, "导入音频(&I)...", None, self.import_files)
         self._add_action(menu_edit, "删除选中曲目", QKeySequence.StandardKey.Delete, self.remove_selected)
 
         # 工具
         menu_tools = menubar.addMenu("工具(&T)")
-        self._add_action(menu_tools, "导入音频(&I)...", None, self.import_files)
         self._add_action(menu_tools, "项目设置(&P)...", None, self.project_settings)
 
         # 帮助

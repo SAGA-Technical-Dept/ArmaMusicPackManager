@@ -11,9 +11,23 @@
 5. **AI 文件名翻译** — 接入在线 AI API，将英文曲目名翻译为中文显示名（`name` 字段）
 6. **UI** — 简洁、紧凑、美观的图形界面
 
+## 环境要求
+
+- Python 3.10+
+- [FFmpeg](https://ffmpeg.org/download.html)（转码与音频信息读取，需在 `PATH` 中）
+
+## 安装与运行
+
+```bash
+pip install -r requirements.txt
+python src/main.py
+```
+
 ## 参考实现
 
-`demo_files/douzi_SAGA_music/` 是一个完整的 Arma 3 音乐模组范例（=SAGA= 导演任务基础气氛音乐包，作者 豆子Doge），作为管理器输出格式的参考标准。其结构契约见 `CLAUDE.md`：
+`demo_files/douzi_SAGA_music/` 是一个完整的 Arma 3 音乐模组范例（=SAGA= 导演任务基础气氛音乐包，作者 豆子Doge），作为管理器输出格式的参考标准。
+
+> **该目录不随本仓库分发**：其中包含第三方商业游戏的版权音频，仅保留在本地用于格式校验。若需自行准备参考样本，请按下列结构契约组织。其结构契约见 `CLAUDE.md`：
 
 - config.cpp 三部分：CfgPatches（模组身份）、CfgMusicClasses（专辑分类）、CfgMusic（曲目条目）
 - `sound[]` 路径前缀固定为 `douzi\douzi_SAGA_music\`

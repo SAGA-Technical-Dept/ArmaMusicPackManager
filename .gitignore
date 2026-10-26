@@ -9,3 +9,9 @@ projects/
 # PyInstaller build artifacts
 build/
 dist/
+
+# 参考模组含第三方版权音频，不纳入公开仓库（见 README）
+demo_files/
+
+# 历史重写前的一次性备份
+*.bundle

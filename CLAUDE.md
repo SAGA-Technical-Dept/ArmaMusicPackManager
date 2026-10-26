@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `demo_files/douzi_SAGA_music/` 是一个完整的 Arma 3 音乐模组参考实现，作为管理器输出格式的校验基准（生成器已通过与它的逐字段对照验证）。
 
+> **注意：** 该目录含第三方版权音频，已从公开仓库的**全部历史**中移除并被 `.gitignore` 忽略，只存在于本地工作区。涉及 `demo_files` 的校验步骤仅在本地可执行；缺失时应跳过而非报错。
+
 **写入约束：** 所有文件写入操作（创建、编辑、覆盖）仅限本仓库文件夹内，严禁写入仓库以外的任何区域（Claude 自身的记忆系统除外）。
 
 ## 仓库内容：Arma 3 音乐模组
